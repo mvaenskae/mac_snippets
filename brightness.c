@@ -13,7 +13,7 @@ struct data {
 const char *p_brightness = "/sys/class/backlight/nv_backlight/brightness";
 
 int process_input(char *, struct data *);
-size_t set_brightness(FILE *, const long *);
+size_t set_brightness(FILE *, long);
 long get_brightness(FILE *);
 
 /*
@@ -49,7 +49,8 @@ int main(int argc, char *argv[])
                 brgt->brightness = 1;
         }
 
-        printf("We would set brightness to %ld from %ld\n", brgt->brightness, temp_brightness);
+        printf("We would set brightness to %ld(%lX) from %ld(%lX)\n", brgt->brightness, brgt->brightness, temp_brightness, temp_brightness);
+        size_t write = set_brightness(fp, brgt->brightness);
 
         free(brgt);
 
@@ -187,9 +188,15 @@ long get_brightness(FILE *fp)
  ** This function is used just for setting the brightness. It reports errors
  ** according to errno of fwrite.
  **/
-size_t set_brightness(FILE *fp, const long *val)
+size_t set_brightness(FILE *fp, long val)
 {
-        size_t write;
+        size_t write = 0;
+
+        /* Converting the long into a char[4], we need to include 0A */
+        char *test = malloc(4*sizeof(char));
+        memset(test, 0, 4*sizeof(char));
+        int conv = snprintf(test, 4, "%ld", val);
+        printf("%s\n", test);
 
         if (fp) {
                 perror("File still open. Closing file as a precaution!i");
@@ -207,7 +214,8 @@ size_t set_brightness(FILE *fp, const long *val)
                 exit(EXIT_FAILURE);
         }
 
-        write = fwrite(val, sizeof(long), 1, fp);
+        write = fwrite(test, sizeof(char), 4, fp);
+        free(test);
 
         if (fclose(fp)) {
                 perror("fclose failed");
