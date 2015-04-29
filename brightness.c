@@ -49,58 +49,10 @@ int main(int argc, char *argv[])
                 brgt->brightness = 1;
         }
 
-        printf("We would set brightness to %ld(%lX) from %ld(%lX)\n", brgt->brightness, brgt->brightness, temp_brightness, temp_brightness);
         size_t write = set_brightness(fp, brgt->brightness);
 
         free(brgt);
 
-        /* Convert value to string */
-
-        /*
-        f_brightness = fopen(p_brightness, "rb");
-
-        if (!f_brightness) {
-                perror("fopen");
-                exit(EXIT_FAILURE);
-        }
-
-        c_brightness = calloc(3, sizeof(char));
-
-        size_t reading = fread(c_brightness, 1, 3, f_brightness);
-
-        if (!reading) {
-                perror("fread");
-                exit(EXIT_FAILURE);
-        }
-
-        printf("Read in 3 chars from file, got content: %s (would set to %ld)\n", c_brightness, brightness); 
-        free(c_brightness);
-        c_brigthness = NULL;
-        */
-        /*f_brightness = fopen(p_brightness, "wb");
-
-        if (!f_brightness) {
-                perror("fopen");
-                exit(EXIT_FAILURE);
-        }
-
-        //c_brightness = calloc(3, sizeof(char));
-        c_brightness = argv[1];
-
-        size_t writing = fwrite(c_brightness, 1, 3, f_brightness);
-
-        if (!writing) {
-                perror("fread");
-                exit(EXIT_FAILURE);
-        }
-
-        printf("Wrote new brightness value %s!\n", c_brightness);
-        //free(c_brightness);
-        //c_brightness = NULL;
-        */
-
-        /* WRITE VALUE INSIDE FILE at /sys/class/backlight/nv_backlight/brightness */
-        
         exit(EXIT_SUCCESS);
 }
 
@@ -196,7 +148,6 @@ size_t set_brightness(FILE *fp, long val)
         char *test = malloc(4*sizeof(char));
         memset(test, 0, 4*sizeof(char));
         int conv = snprintf(test, 4, "%ld", val);
-        printf("%s\n", test);
 
         if (fp) {
                 perror("File still open. Closing file as a precaution!i");
