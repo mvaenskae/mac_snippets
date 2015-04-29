@@ -10,7 +10,7 @@ struct data {
         int sign;
 };
 
-const char *p_brightness = "/sys/class/backlight/nv_backlight/brightness";
+const static char *p_brightness = "/sys/class/backlight/nv_backlight/brightness";
 
 int process_input(char *, struct data *);
 size_t set_brightness(FILE *, long);
@@ -33,13 +33,19 @@ int main(int argc, char *argv[])
                 exit(EXIT_FAILURE);
         }
 
-        long temp_brightness = get_brightness(fp);
+        fp = fopen(p_brightness, "rb+");
+
+        if (!fp) {
+                perror("fopen failed");
+                exit(EXIT_FAILURE);
+        }
 
         process_input(argv[1], brgt);
+        long curr_brightness = get_brightness(fp);
 
-        if (brgt->sign != 0) {
+        if (brgt->sign) {
         /* We have a relative value to set */
-                brgt->brightness = get_brightness(fp) + brgt->brightness;
+                brgt->brightness = curr_brightness + brgt->brightness;
         }
 
         /* Check and set sensible bounds */
@@ -50,6 +56,11 @@ int main(int argc, char *argv[])
         }
 
         size_t write = set_brightness(fp, brgt->brightness);
+        
+        if (fclose(fp)) {
+                perror("fclose failed");
+                exit(EXIT_FAILURE);
+        }
 
         free(brgt);
 
@@ -105,33 +116,13 @@ int process_input(char *argv, struct data *store)
  */
 long get_brightness(FILE *fp)
 {
-        if (fp) {
-                perror("File still open. Closing file as a precaution!i");
-                if (fclose(fp)) {
-                        perror("fclose failed");
-                        exit(EXIT_FAILURE);
-                }
-                
-        }
-
-        fp = fopen(p_brightness, "rb");
-
-        if (!fp) {
-                perror("fopen failed");
-                exit(EXIT_FAILURE);
-        }
-
         /* Reading in the number and converting it to a long */
         char *temp = malloc(3 * sizeof(char));
         memset(temp, 0, 3*sizeof(char));
         size_t read = fread(temp, sizeof(char), 3, fp);
+        
         long val = strtol(temp, NULL, 10);
         free(temp);
-
-        if (fclose(fp)) {
-                perror("fclose failed");
-                exit(EXIT_FAILURE);
-        }
 
         return val;
 }
@@ -142,36 +133,13 @@ long get_brightness(FILE *fp)
  **/
 size_t set_brightness(FILE *fp, long val)
 {
-        size_t write = 0;
-
         /* Converting the long into a char[4], we need to include 0A */
         char *test = malloc(4*sizeof(char));
         memset(test, 0, 4*sizeof(char));
         int conv = snprintf(test, 4, "%ld", val);
 
-        if (fp) {
-                perror("File still open. Closing file as a precaution!i");
-                if (fclose(fp)) {
-                        perror("fclose failed");
-                        exit(EXIT_FAILURE);
-                }
-                
-        }
-
-        fp = fopen(p_brightness, "wb");
-
-        if (!fp) {
-                perror("fopen failed");
-                exit(EXIT_FAILURE);
-        }
-
-        write = fwrite(test, sizeof(char), 4, fp);
+        size_t write = fwrite(test, sizeof(char), 4, fp);
         free(test);
-
-        if (fclose(fp)) {
-                perror("fclose failed");
-                exit(EXIT_FAILURE);
-        }
 
         return write;
 }
