@@ -24,8 +24,8 @@ long get_brightness(FILE *);
  */
 int main(int argc, char *argv[])
 {
-        struct data *brgt = malloc(sizeof(brgt));
-        memset(brgt, 0, sizeof(*brgt));
+        struct data *brgt = malloc(sizeof(struct data));
+        memset(brgt, 0, sizeof(struct data));
         FILE *fp = NULL;
 
         if (argc != 2) {
@@ -37,7 +37,7 @@ int main(int argc, char *argv[])
 
         process_input(argv[1], brgt);
 
-        if (brgt->sign) {
+        if (brgt->sign != 0) {
         /* We have a relative value to set */
                 brgt->brightness = get_brightness(fp) + brgt->brightness;
         }
