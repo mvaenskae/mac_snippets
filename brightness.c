@@ -20,20 +20,18 @@ long get_brightness(FILE *);
  ** This code is based on the manpages on strtol. It removed an atoi() call
  ** and will just take 1 parameter. It will further check for the parameter
  ** to be within a certain range. If it does not match it will be set to the
- ** closest upper bound.
+ ** closest bound.
  */
 int main(int argc, char *argv[])
 {
-        struct data *brgt = malloc(sizeof(struct data));
-        memset(brgt, 0, sizeof(struct data));
-        FILE *fp = NULL;
-
         if (argc != 2) {
                 fprintf(stderr, "Usage: %s str\n", argv[0]);
                 exit(EXIT_FAILURE);
         }
 
-        fp = fopen(p_brightness, "rb+");
+        struct data *brgt = malloc(sizeof(struct data));
+        memset(brgt, 0, sizeof(struct data));
+        FILE *fp = fopen(p_brightness, "rb+");
 
         if (!fp) {
                 perror("fopen failed");
@@ -43,8 +41,8 @@ int main(int argc, char *argv[])
         process_input(argv[1], brgt);
         long curr_brightness = get_brightness(fp);
 
-        if (brgt->sign) {
         /* We have a relative value to set */
+        if (brgt->sign) {
                 brgt->brightness = curr_brightness + brgt->brightness;
         }
 
@@ -82,6 +80,11 @@ int process_input(char *argv, struct data *store)
         errno = 0;    /* To distinguish success/failure after call */
         store->brightness = strtol(str, &endptr, base);
 
+        /* Check for existing sign to set flag for proper function call */
+        if (argv[0] == '+' || argv[0] == '-') {
+                store->sign = 1;
+        }
+
         /* Check for various possible errors */
         if ((errno == ERANGE 
                         && (store->brightness == LONG_MAX
@@ -95,12 +98,6 @@ int process_input(char *argv, struct data *store)
                 fprintf(stderr, "No digits were found\n");
                 exit(EXIT_FAILURE);
         }
-
-        /* Check for existing sign to set flag for proper function call */
-        if (argv[0] == '+' || argv[0] == '-') {
-                store->sign = 1;
-        }
-        // handle error!
 
         if (*endptr != '\0'){        /* Not necessarily an error... */
                 printf("Further characters after number: %s\n", endptr);
@@ -119,8 +116,8 @@ long get_brightness(FILE *fp)
         /* Reading in the number and converting it to a long */
         char *temp = malloc(3 * sizeof(char));
         memset(temp, 0, 3*sizeof(char));
+
         size_t read = fread(temp, sizeof(char), 3, fp);
-        
         long val = strtol(temp, NULL, 10);
         free(temp);
 
