@@ -1,4 +1,4 @@
-#include <endian.h>
+#define _DEFAULT_SOURCE
 #include <errno.h>
 #include <limits.h>
 #include <stdio.h>
@@ -7,7 +7,7 @@
 
 struct data {
         long brightness;
-        char sign;
+        int sign;
 };
 
 const char *p_brightness = "/sys/class/backlight/nv_backlight/brightness";
@@ -37,13 +37,9 @@ int main(int argc, char *argv[])
 
         process_input(argv[1], brgt);
 
-        if (brgt->sign != '\0') {
+        if (brgt->sign) {
         /* We have a relative value to set */
-                if (brgt->sign == '+') {
-                        brgt->brightness = get_brightness(fp) + brgt->brightness;
-                } else {
-                        brgt->brightness = get_brightness(fp) - brgt->brightness;
-                }
+                brgt->brightness = get_brightness(fp) + brgt->brightness;
         }
 
         /* Check and set sensible bounds */
@@ -54,6 +50,8 @@ int main(int argc, char *argv[])
         }
 
         printf("We would set brightness to %ld from %ld\n", brgt->brightness, temp_brightness);
+
+        free(brgt);
 
         /* Convert value to string */
 
@@ -118,10 +116,12 @@ int process_input(char *argv, struct data *store)
 
         str = argv;
         errno = 0;    /* To distinguish success/failure after call */
-        val = strtol(str, &endptr, base);
+        store->brightness = strtol(str, &endptr, base);
 
         /* Check for various possible errors */
-        if ((errno == ERANGE && (val == LONG_MAX || val == LONG_MIN))
+        if ((errno == ERANGE 
+                        && (store->brightness == LONG_MAX
+                                || store->brightness == LONG_MIN))
                         || (errno != 0 && val == 0)) {
                 perror("strtol");
                 exit(EXIT_FAILURE);
@@ -133,20 +133,10 @@ int process_input(char *argv, struct data *store)
         }
 
         /* Check for existing sign to set flag for proper function call */
-        if (argv[0] == '+') {
-                store->sign = '+';
-        } else if (argv[0] == '-') {
-                store->sign = '-';
+        if (argv[0] == '+' || argv[0] == '-') {
+                store->sign = 1;
         }
-
-        /* Ensure value is within range */
-        if (val > 100) {
-                val = 100;
-        } else if (val < 1) {
-                val = 1;
-        }
-
-        store->brightness = val;
+        // handle error!
 
         if (*endptr != '\0'){        /* Not necessarily an error... */
                 printf("Further characters after number: %s\n", endptr);
@@ -178,19 +168,19 @@ long get_brightness(FILE *fp)
                 exit(EXIT_FAILURE);
         }
 
-        long *temp = malloc(sizeof(long));
-        memset(temp, 0, sizeof(long));
-
-        size_t read = fread(temp, sizeof(long), 1, fp);
-        long tmp = *temp;
-        printf("%lx\n", tmp);
+        /* Reading in the number and converting it to a long */
+        char *temp = malloc(3 * sizeof(char));
+        memset(temp, 0, 3*sizeof(char));
+        size_t read = fread(temp, sizeof(char), 3, fp);
+        long val = strtol(temp, NULL, 10);
+        free(temp);
 
         if (fclose(fp)) {
                 perror("fclose failed");
                 exit(EXIT_FAILURE);
         }
 
-        return tmp;
+        return val;
 }
 
 /*
