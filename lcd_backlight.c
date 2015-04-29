@@ -10,7 +10,9 @@ struct data {
         int sign;
 };
 
-const static char *p_brightness = "/sys/class/backlight/nv_backlight/brightness";
+/* Read in maximum brightness via files, not hardcoded */
+const static char *path_val = "/sys/class/backlight/nv_backlight/brightness";
+const static char *path_max_val = "/sys/class/backlight/nv_backlight/max_brightness";
 
 int process_input(char *, struct data *);
 size_t set_brightness(FILE *, long);
@@ -31,26 +33,40 @@ int main(int argc, char *argv[])
 
         struct data *brgt = malloc(sizeof(struct data));
         memset(brgt, 0, sizeof(struct data));
-        FILE *fp = fopen(p_brightness, "rb+");
+        FILE *fp = fopen(path_val, "rb+");
 
         if (!fp) {
                 perror("fopen failed");
                 exit(EXIT_FAILURE);
         }
 
+        FILE *fp2 = fopen(path_max_val, "rb");
+
+        if (!fp2) {
+                perror("fopen failed");
+                exit(EXIT_FAILURE);
+        }
+
         process_input(argv[1], brgt);
-        long curr_brightness = get_brightness(fp);
+        long val = get_brightness(fp);
+        long max_val = get_brightness(fp2);
+        long min_val = 1; /* set to 1 for lcd-backlight */
+
+        if (fclose(fp2)) {
+                perror("fclose failed");
+                exit(EXIT_FAILURE);
+        }
 
         /* We have a relative value to set */
         if (brgt->sign) {
-                brgt->brightness = curr_brightness + brgt->brightness;
+                brgt->brightness = val + brgt->brightness;
         }
 
         /* Check and set sensible bounds */
-        if (brgt->brightness > 100) {
-                brgt->brightness = 100;
-        } else if (brgt->brightness < 1) {
-                brgt->brightness = 1;
+        if (brgt->brightness > max_val) {
+                brgt->brightness = max_val;
+        } else if (brgt->brightness < min_val) {
+                brgt->brightness = min_val;
         }
 
         size_t write = set_brightness(fp, brgt->brightness);
