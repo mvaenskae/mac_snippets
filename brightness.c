@@ -1,3 +1,4 @@
+#include <endian.h>
 #include <errno.h>
 #include <limits.h>
 #include <stdio.h>
@@ -11,11 +12,9 @@ struct data {
 
 const char *p_brightness = "/sys/class/backlight/nv_backlight/brightness";
 
-//void absolute_brightness();
-//void relative_brightness(FILE, int pm, char *);
-int process_input(int, char *, struct data *);
-//void set_brightness();
-//int get_brightness();
+int process_input(char *, struct data *);
+size_t set_brightness(FILE *, const long *);
+long get_brightness(FILE *);
 
 /*
  ** This code is based on the manpages on strtol. It removed an atoi() call
@@ -27,21 +26,34 @@ int main(int argc, char *argv[])
 {
         struct data *brgt = malloc(sizeof(brgt));
         memset(brgt, 0, sizeof(*brgt));
+        FILE *fp = NULL;
 
         if (argc != 2) {
                 fprintf(stderr, "Usage: %s str\n", argv[0]);
                 exit(EXIT_FAILURE);
         }
 
-        process_input(argc, argv[1], brgt);
+        long temp_brightness = get_brightness(fp);
+
+        process_input(argv[1], brgt);
 
         if (brgt->sign != '\0') {
         /* We have a relative value to set */
-                printf("Relative value\n");
-        } else {
-        /* We have an absolute value */
-                printf("Absolute value\n");
+                if (brgt->sign == '+') {
+                        brgt->brightness = get_brightness(fp) + brgt->brightness;
+                } else {
+                        brgt->brightness = get_brightness(fp) - brgt->brightness;
+                }
         }
+
+        /* Check and set sensible bounds */
+        if (brgt->brightness > 100) {
+                brgt->brightness = 100;
+        } else if (brgt->brightness < 1) {
+                brgt->brightness = 1;
+        }
+
+        printf("We would set brightness to %ld from %ld\n", brgt->brightness, temp_brightness);
 
         /* Convert value to string */
 
@@ -98,7 +110,7 @@ int main(int argc, char *argv[])
  ** guaranteed to be of the correct format. It will parse the string and store
  ** extracted values within struct data before returning.
  */
-int process_input(int argc, char *argv, struct data *store)
+int process_input(char *argv, struct data *store)
 {
         const int base = 10;
         char *endptr, *str;
@@ -141,4 +153,76 @@ int process_input(int argc, char *argv, struct data *store)
         }
         
         return(EXIT_SUCCESS);
+}
+
+/*
+ ** This function returns the current brightness of the file.
+ ** It will be read in as a long to return type-conforming values.
+ ** It will NOT return the value of fread.
+ */
+long get_brightness(FILE *fp)
+{
+        if (fp) {
+                perror("File still open. Closing file as a precaution!i");
+                if (fclose(fp)) {
+                        perror("fclose failed");
+                        exit(EXIT_FAILURE);
+                }
+                
+        }
+
+        fp = fopen(p_brightness, "rb");
+
+        if (!fp) {
+                perror("fopen failed");
+                exit(EXIT_FAILURE);
+        }
+
+        long *temp = malloc(sizeof(long));
+        memset(temp, 0, sizeof(long));
+
+        size_t read = fread(temp, sizeof(long), 1, fp);
+        long tmp = *temp;
+        printf("%lx\n", tmp);
+
+        if (fclose(fp)) {
+                perror("fclose failed");
+                exit(EXIT_FAILURE);
+        }
+
+        return tmp;
+}
+
+/*
+ ** This function is used just for setting the brightness. It reports errors
+ ** according to errno of fwrite.
+ **/
+size_t set_brightness(FILE *fp, const long *val)
+{
+        size_t write;
+
+        if (fp) {
+                perror("File still open. Closing file as a precaution!i");
+                if (fclose(fp)) {
+                        perror("fclose failed");
+                        exit(EXIT_FAILURE);
+                }
+                
+        }
+
+        fp = fopen(p_brightness, "wb");
+
+        if (!fp) {
+                perror("fopen failed");
+                exit(EXIT_FAILURE);
+        }
+
+        write = fwrite(val, sizeof(long), 1, fp);
+
+        if (fclose(fp)) {
+                perror("fclose failed");
+                exit(EXIT_FAILURE);
+        }
+
+        return write;
 }
