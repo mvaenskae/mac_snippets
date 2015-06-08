@@ -5,8 +5,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define IS_LCD 1 /* set to 1 for LCD not going completely dark */
+
 struct data {
-        long brightness;
+        long val;
         int sign;
 };
 
@@ -15,8 +17,8 @@ const static char *path_val = "/sys/class/backlight/nv_backlight/brightness";
 const static char *path_max_val = "/sys/class/backlight/nv_backlight/max_brightness";
 
 int process_input(char *, struct data *);
-size_t set_brightness(FILE *, long);
-long get_brightness(FILE *);
+size_t set_value(FILE *, long);
+long get_value(FILE *);
 
 /*
  ** This code is based on the manpages on strtol. It removed an atoi() call
@@ -26,18 +28,28 @@ long get_brightness(FILE *);
  */
 int main(int argc, char *argv[])
 {
-        if (argc != 2) {
+        if (argc > 2) {
                 fprintf(stderr, "Usage: %s str\n", argv[0]);
                 exit(EXIT_FAILURE);
         }
 
-        struct data *brgt = malloc(sizeof(struct data));
-        memset(brgt, 0, sizeof(struct data));
+        struct data *value = malloc(sizeof(struct data));
+        memset(value, 0, sizeof(struct data));
         FILE *fp = fopen(path_val, "rb+");
 
         if (!fp) {
                 perror("fopen failed");
                 exit(EXIT_FAILURE);
+        }
+
+        if (argc == 1) {
+                printf("%ld\n", get_value(fp));
+                if (fclose(fp)) {
+                        perror("fclose failed");
+                        exit(EXIT_FAILURE);
+                }
+                free(value);
+                exit(EXIT_SUCCESS);
         }
 
         FILE *fp2 = fopen(path_max_val, "rb");
@@ -47,10 +59,10 @@ int main(int argc, char *argv[])
                 exit(EXIT_FAILURE);
         }
 
-        process_input(argv[1], brgt);
-        long val = get_brightness(fp);
-        long max_val = get_brightness(fp2);
-        long min_val = 1; /* set to 1 for lcd-backlight */
+        process_input(argv[1], value);
+        long val = get_value(fp);
+        long max_val = get_value(fp2);
+        long min_val = IS_LCD; /* set to 1 for lcd-backlight */
 
         if (fclose(fp2)) {
                 perror("fclose failed");
@@ -58,25 +70,25 @@ int main(int argc, char *argv[])
         }
 
         /* We have a relative value to set */
-        if (brgt->sign) {
-                brgt->brightness = val + brgt->brightness;
+        if (value->sign) {
+                value->val = val + value->val;
         }
 
         /* Check and set sensible bounds */
-        if (brgt->brightness > max_val) {
-                brgt->brightness = max_val;
-        } else if (brgt->brightness < min_val) {
-                brgt->brightness = min_val;
+        if (value->val > max_val) {
+                value->val = max_val;
+        } else if (value->val < min_val) {
+                value->val = min_val;
         }
 
-        size_t write = set_brightness(fp, brgt->brightness);
+        size_t write = set_value(fp, value->val);
         
         if (fclose(fp)) {
                 perror("fclose failed");
                 exit(EXIT_FAILURE);
         }
 
-        free(brgt);
+        free(value);
 
         exit(EXIT_SUCCESS);
 }
@@ -94,7 +106,7 @@ int process_input(char *argv, struct data *store)
 
         str = argv;
         errno = 0;    /* To distinguish success/failure after call */
-        store->brightness = strtol(str, &endptr, base);
+        store->val = strtol(str, &endptr, base);
 
         /* Check for existing sign to set flag for proper function call */
         if (argv[0] == '+' || argv[0] == '-') {
@@ -103,8 +115,8 @@ int process_input(char *argv, struct data *store)
 
         /* Check for various possible errors */
         if ((errno == ERANGE 
-                        && (store->brightness == LONG_MAX
-                                || store->brightness == LONG_MIN))
+                        && (store->val == LONG_MAX
+                                || store->val == LONG_MIN))
                         || (errno != 0 && val == 0)) {
                 perror("strtol");
                 exit(EXIT_FAILURE);
@@ -123,11 +135,11 @@ int process_input(char *argv, struct data *store)
 }
 
 /*
- ** This function returns the current brightness of the file.
+ ** This function returns the current value of the file.
  ** It will be read in as a long to return type-conforming values.
  ** It will NOT return the value of fread.
  */
-long get_brightness(FILE *fp)
+long get_value(FILE *fp)
 {
         /* Reading in the number and converting it to a long */
         char *temp = malloc(3 * sizeof(char));
@@ -141,10 +153,10 @@ long get_brightness(FILE *fp)
 }
 
 /*
- ** This function is used just for setting the brightness. It reports errors
+ ** This function is used just for setting the value. It reports errors
  ** according to errno of fwrite.
  **/
-size_t set_brightness(FILE *fp, long val)
+size_t set_value(FILE *fp, long val)
 {
         /* Converting the long into a char[4], we need to include 0A */
         char *test = malloc(4*sizeof(char));

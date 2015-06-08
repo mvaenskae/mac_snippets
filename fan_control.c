@@ -28,7 +28,7 @@ long get_value(FILE *);
  */
 int main(int argc, char *argv[])
 {
-        if (argc != 2) {
+        if (argc > 2) {
                 fprintf(stderr, "Usage: %s A(utomatic)/{NUMBER}\n", argv[0]);
                 exit(EXIT_FAILURE);
         }
@@ -37,7 +37,7 @@ int main(int argc, char *argv[])
          ** We set back to automatic, no need to set anything else except one
          ** file.
          */
-        if (!strncmp(argv[1], "A", 1)) {
+        if (argc == 2 && !strncmp(argv[1], "A", 1)) {
                 FILE *fp_control = fopen(path_control, "rb+");
 
                 if (!fp_control) {
@@ -62,6 +62,16 @@ int main(int argc, char *argv[])
         if (!fp_val) {
                 perror("fopen failed");
                 exit(EXIT_FAILURE);
+        }
+
+        if (argc == 1) {
+                printf("%ld\n", get_value(fp_val));
+                if (fclose(fp_val)) {
+                        perror("fclose failed");
+                        exit(EXIT_FAILURE);
+                }
+                free(number);
+                exit(EXIT_SUCCESS);
         }
 
         FILE *fp_max = fopen(path_max_val, "rb");
